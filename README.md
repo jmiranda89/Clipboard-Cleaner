@@ -6,6 +6,7 @@ A lightweight clipboard cleaner that keeps only plain text while preserving line
 
 - Desktop GUI built with Tkinter
 - Optional auto-clean mode that watches new clipboard text
+- Optional `Keep bold/italic (Word RTF)` toggle that removes all other formatting
 - CLI mode for text pipelines (`stdin -> stdout`)
 - macOS `.app` bundle build with PyInstaller
 

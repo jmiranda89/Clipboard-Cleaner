@@ -6,9 +6,10 @@ import time
 import tkinter as tk
 from tkinter import ttk
 
-from .cleaning import clean_text
+from .cleaning import CleanClipboardContent, clean_clipboard_content, clean_text
 
 POLL_MS = 500
+RTF_TYPES = ("public.rtf", "RTF", "text/rtf")
 
 
 class ClipboardCleanerApp(tk.Tk):
@@ -19,7 +20,10 @@ class ClipboardCleanerApp(tk.Tk):
         self.minsize(700, 420)
 
         self.last_clipboard_text: str | None = None
+        self.last_clipboard_rtf: str | None = None
+        self.last_loaded_content = CleanClipboardContent(plain_text="")
         self.auto_mode = tk.BooleanVar(value=auto_mode)
+        self.keep_bold_italic_mode = tk.BooleanVar(value=False)
 
         self._build_ui()
         self._schedule_poll()
@@ -40,6 +44,11 @@ class ClipboardCleanerApp(tk.Tk):
             text="Auto-clean new clipboard text",
             variable=self.auto_mode,
         ).pack(side="left", padx=16)
+        ttk.Checkbutton(
+            controls,
+            text="Keep bold/italic (Word RTF)",
+            variable=self.keep_bold_italic_mode,
+        ).pack(side="left")
 
         editor_frame = ttk.Frame(self, padding=(12, 0, 12, 12))
         editor_frame.grid(row=1, column=0, sticky="nsew")
@@ -70,25 +79,87 @@ class ClipboardCleanerApp(tk.Tk):
         except tk.TclError:
             return ""
 
-    def _set_clipboard_text(self, text: str) -> None:
+    def _get_clipboard_rtf(self) -> str:
+        for rtf_type in RTF_TYPES:
+            try:
+                content = self.clipboard_get(type=rtf_type)
+            except tk.TclError:
+                continue
+            if content:
+                return content
+        return ""
+
+    def _set_clipboard_content(self, text: str, rtf: str | None = None) -> None:
         self.clipboard_clear()
         self.clipboard_append(text)
+        if rtf:
+            for rtf_type in RTF_TYPES:
+                try:
+                    self.clipboard_append(rtf, type=rtf_type)
+                    break
+                except tk.TclError:
+                    continue
         try:
             self.update_idletasks()
         except Exception:
             pass
 
-    def read_clipboard(self) -> None:
-        cleaned = clean_text(self._get_clipboard_text())
+    def _render_content(self, content: CleanClipboardContent) -> None:
         self.text_editor.delete("1.0", "end")
-        self.text_editor.insert("1.0", cleaned)
-        self._set_status(f"Loaded {len(cleaned)} characters from clipboard.")
+        if not content.styled_runs:
+            self.text_editor.insert("1.0", content.plain_text)
+            return
+
+        self.text_editor.tag_configure("bold", font=("TkDefaultFont", 10, "bold"))
+        self.text_editor.tag_configure("italic", font=("TkDefaultFont", 10, "italic"))
+        self.text_editor.tag_configure("bold_italic", font=("TkDefaultFont", 10, "bold italic"))
+
+        index = "1.0"
+        for run in content.styled_runs:
+            self.text_editor.insert(index, run.text)
+            end = self.text_editor.index(f"{index}+{len(run.text)}c")
+            if run.bold and run.italic:
+                self.text_editor.tag_add("bold_italic", index, end)
+            elif run.bold:
+                self.text_editor.tag_add("bold", index, end)
+            elif run.italic:
+                self.text_editor.tag_add("italic", index, end)
+            index = end
+
+    def read_clipboard(self) -> None:
+        raw_text = self._get_clipboard_text()
+        raw_rtf = self._get_clipboard_rtf()
+        content = clean_clipboard_content(
+            text=raw_text,
+            rtf=raw_rtf,
+            keep_bold_italic=self.keep_bold_italic_mode.get(),
+        )
+        self.last_loaded_content = content
+        self._render_content(content)
+        if content.rtf:
+            self._set_status(
+                f"Loaded {len(content.plain_text)} characters (bold/italic preserved for Word)."
+            )
+        else:
+            self._set_status(f"Loaded {len(content.plain_text)} characters from clipboard.")
 
     def copy_clean_text(self) -> None:
         current = self.text_editor.get("1.0", "end-1c")
         cleaned = clean_text(current)
-        self._set_clipboard_text(cleaned)
-        self._set_status("Copied clean plain text to clipboard.")
+        rtf = None
+        if (
+            self.keep_bold_italic_mode.get()
+            and self.last_loaded_content.rtf
+            and current == self.last_loaded_content.plain_text
+        ):
+            rtf = self.last_loaded_content.rtf
+        self._set_clipboard_content(cleaned, rtf=rtf)
+        if rtf:
+            self._set_status("Copied clean text with Word-compatible bold/italic.")
+        elif self.keep_bold_italic_mode.get():
+            self._set_status("Copied clean plain text. (Bold/italic kept only when clipboard text is unchanged.)")
+        else:
+            self._set_status("Copied clean plain text to clipboard.")
 
     def clear_editor(self) -> None:
         self.text_editor.delete("1.0", "end")
@@ -100,19 +171,29 @@ class ClipboardCleanerApp(tk.Tk):
     def _poll_clipboard(self) -> None:
         try:
             if self.auto_mode.get():
-                raw = self._get_clipboard_text()
-                if raw and raw != self.last_clipboard_text:
-                    cleaned = clean_text(raw)
-                    self._set_clipboard_text(cleaned)
-                    self.last_clipboard_text = cleaned
-                    self.text_editor.delete("1.0", "end")
-                    self.text_editor.insert("1.0", cleaned)
+                raw_text = self._get_clipboard_text()
+                raw_rtf = self._get_clipboard_rtf()
+                if raw_text and (raw_text != self.last_clipboard_text or raw_rtf != self.last_clipboard_rtf):
+                    content = clean_clipboard_content(
+                        text=raw_text,
+                        rtf=raw_rtf,
+                        keep_bold_italic=self.keep_bold_italic_mode.get(),
+                    )
+                    self._set_clipboard_content(content.plain_text, rtf=content.rtf)
+                    self.last_clipboard_text = content.plain_text
+                    self.last_clipboard_rtf = content.rtf
+                    self.last_loaded_content = content
+                    self._render_content(content)
                     now = time.strftime("%H:%M:%S")
-                    self._set_status(f"Auto-cleaned clipboard at {now}.")
+                    if content.rtf:
+                        self._set_status(f"Auto-cleaned clipboard at {now} (kept bold/italic).")
+                    else:
+                        self._set_status(f"Auto-cleaned clipboard at {now}.")
             else:
                 current = self._get_clipboard_text()
                 if current:
                     self.last_clipboard_text = current
+                self.last_clipboard_rtf = self._get_clipboard_rtf()
         finally:
             self._schedule_poll()
 
