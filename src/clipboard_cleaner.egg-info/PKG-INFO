@@ -1,0 +1,67 @@
+Metadata-Version: 2.4
+Name: clipboard-cleaner
+Version: 1.0.0
+Summary: Professional plain-text clipboard cleaner for macOS
+Author: J. Miranda
+Project-URL: Homepage, https://example.com
+Keywords: clipboard,tkinter,macos,text
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: MacOS X
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Topic :: Utilities
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0; extra == "dev"
+Provides-Extra: build
+Requires-Dist: pyinstaller>=6.0; extra == "build"
+
+# Clipboard Cleaner
+
+A lightweight clipboard cleaner that keeps only plain text while preserving line breaks and indentation.
+
+## Features
+
+- Desktop GUI built with Tkinter
+- Optional auto-clean mode that watches new clipboard text
+- CLI mode for text pipelines (`stdin -> stdout`)
+- macOS `.app` bundle build with PyInstaller
+
+## Install and run (Python)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+clipboard-cleaner
+```
+
+Or run directly from source:
+
+```bash
+PYTHONPATH=src python -m clipboard_cleaner
+```
+
+## CLI usage
+
+```bash
+echo $'A\r\nB\u00A0C' | clipboard-cleaner --clean-stdin
+```
+
+## Build macOS app bundle
+
+```bash
+./scripts/build_macos_app.sh
+```
+
+The output app bundle will be written to `dist/Clipboard Cleaner.app`.
+
+## Development
+
+```bash
+pip install -e .[dev]
+pytest
+```

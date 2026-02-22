@@ -1,0 +1,2 @@
+[console_scripts]
+clipboard-cleaner = clipboard_cleaner.cli:main

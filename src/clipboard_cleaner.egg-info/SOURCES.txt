@@ -1,0 +1,14 @@
+README.md
+pyproject.toml
+src/clipboard_cleaner/__init__.py
+src/clipboard_cleaner/__main__.py
+src/clipboard_cleaner/app.py
+src/clipboard_cleaner/cleaning.py
+src/clipboard_cleaner/cli.py
+src/clipboard_cleaner.egg-info/PKG-INFO
+src/clipboard_cleaner.egg-info/SOURCES.txt
+src/clipboard_cleaner.egg-info/dependency_links.txt
+src/clipboard_cleaner.egg-info/entry_points.txt
+src/clipboard_cleaner.egg-info/requires.txt
+src/clipboard_cleaner.egg-info/top_level.txt
+tests/test_cleaning.py
